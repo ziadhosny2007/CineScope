@@ -2,8 +2,11 @@ import 'package:cinema_scope/core/routes/app_router.dart';
 import 'package:cinema_scope/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:rive/rive.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await RiveNative.init();
   runApp(const MyApp());
 }
 
@@ -21,7 +24,9 @@ class MyApp extends StatelessWidget {
         return MaterialApp.router(
           debugShowCheckedModeBanner: false,
           routerConfig: AppRouter.router,
-          theme: AppTheme.darkMode,
+          themeMode: ThemeMode.dark,
+          theme: AppTheme.lightMode,
+          darkTheme: AppTheme.darkMode,
         );
       },
     );

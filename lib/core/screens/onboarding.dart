@@ -1,8 +1,9 @@
 import 'package:cinema_scope/core/routes/app_router.dart';
-import 'package:cinema_scope/core/theme/app_color.dart';
+import 'package:cinema_scope/core/widget/btn.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 class Onboarding extends StatefulWidget {
@@ -23,8 +24,6 @@ class _OnboardingState extends State<Onboarding> {
       "subTitle":
           "Discover remarkable films, hidden gems and your next all-time favorite.",
       "btn": "Continue",
-
-      "end": false,
     },
 
     {
@@ -35,7 +34,6 @@ class _OnboardingState extends State<Onboarding> {
       "subTitle":
           "Save the films that catch your eye. Make every movie night a good one.",
       "btn": "Continue",
-      "end": false,
     },
     {
       "image": "assets/images/o3.jpg",
@@ -45,8 +43,6 @@ class _OnboardingState extends State<Onboarding> {
       "subTitle":
           "Filter by genre, year and rating. Less time deciding. More time watching.",
       "btn": "Get started",
-
-      "end": true,
     },
   ];
   PageController? controller;
@@ -101,7 +97,7 @@ class _OnboardingState extends State<Onboarding> {
             style: TextStyle(
               fontSize: 32.sp,
               fontWeight: .bold,
-              color: Colors.white,
+              color: Theme.of(context).hintColor,
             ),
           ),
           SizedBox(
@@ -123,7 +119,7 @@ class _OnboardingState extends State<Onboarding> {
                   effect: ExpandingDotsEffect(
                     dotHeight: 10.h,
                     dotWidth: 10.h,
-                    activeDotColor: AppColor.accentDark,
+                    activeDotColor: Theme.of(context).primaryColor,
                   ),
                 ),
               ],
@@ -136,8 +132,11 @@ class _OnboardingState extends State<Onboarding> {
           padding: EdgeInsets.symmetric(vertical: 10.w, horizontal: 14.w),
           child: Btn(
             title: pages[index]["btn"],
-            onPressed: () {
+            onPressed: () async {
               if (index == pages.length - 1) {
+                SharedPreferencesAsync sharedPreferencesAsync =
+                    SharedPreferencesAsync();
+                await sharedPreferencesAsync.setBool("isFirst", false);
                 context.go(AppRouter.login);
               } else {
                 controller?.animateToPage(
@@ -147,7 +146,6 @@ class _OnboardingState extends State<Onboarding> {
                 );
               }
             },
-            color: Theme.of(context).highlightColor,
           ),
         ),
       ),
@@ -156,39 +154,6 @@ class _OnboardingState extends State<Onboarding> {
 }
 
 // ignore: must_be_immutable
-class Btn extends StatelessWidget {
-  Btn({
-    super.key,
-    required this.title,
-    required this.onPressed,
-    required this.color,
-  });
-  Function() onPressed;
-  Color color;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 330.w,
-      height: 52,
-      child: MaterialButton(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        color: color,
-        onPressed: onPressed,
-
-        child: Text(
-          title,
-          style: TextStyle(
-            fontSize: 16.sp,
-            fontWeight: .w700,
-            color: Color(0xff1B1009),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ignore: must_be_immutable
 class OnboardingImage extends StatelessWidget {
@@ -232,7 +197,7 @@ class OnboardingImage extends StatelessWidget {
               width: 128.w,
               alignment: .center,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
                 color: Color(0xff0D0F12),
               ),
               child: Text(

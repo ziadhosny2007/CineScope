@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Splash extends StatefulWidget {
   const Splash({super.key});
@@ -14,11 +15,17 @@ class Splash extends StatefulWidget {
 }
 
 class _SplashState extends State<Splash> {
+  SharedPreferencesAsync sharedPreferencesAsync = SharedPreferencesAsync();
   @override
   void initState() {
     super.initState();
-    Future.delayed(Duration(seconds: 5), () {
-      context.go(AppRouter.onboarding);
+    Future.delayed(Duration(seconds: 5), () async {
+      bool? isFirst = await sharedPreferencesAsync.getBool("isFirst");
+      if (isFirst == false) {
+        context.go(AppRouter.login);
+      } else {
+        context.go(AppRouter.onboarding);
+      }
     });
   }
 
@@ -51,7 +58,7 @@ class _SplashState extends State<Splash> {
                 width: 84,
                 alignment: .center,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(25),
+                  borderRadius: BorderRadius.circular(25.r),
                   color: AppColor.accentDark,
                 ),
                 child: Icon(Icons.play_arrow_outlined, size: 56),
@@ -81,14 +88,6 @@ class _SplashState extends State<Splash> {
                 ),
               ),
             ),
-            // Stack(
-            //   children: [
-            //     Positioned(
-            //       bottom: 40,
-
-            //       child:
-            //   ],
-            // ),
           ],
         ),
       ),
