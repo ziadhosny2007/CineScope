@@ -1,8 +1,17 @@
+import 'dart:async';
+
+import 'package:cinema_scope/core/routes/app_router.dart';
+import 'package:cinema_scope/core/validator.dart';
 import 'package:cinema_scope/core/widget/btn.dart';
 import 'package:cinema_scope/core/widget/dark_btn.dart';
+import 'package:cinema_scope/core/widget/textfield.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:rive/rive.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -12,9 +21,10 @@ class Login extends StatefulWidget {
 }
 
 class _LoginState extends State<Login> {
+  bool isLoading = false;
   final TextEditingController email = TextEditingController();
   final TextEditingController password = TextEditingController();
-
+  final GlobalKey<FormState> form = GlobalKey<FormState>();
   final FocusNode emailFocus = FocusNode();
   final FocusNode passwordFocus = FocusNode();
 
@@ -30,7 +40,7 @@ class _LoginState extends State<Login> {
   @override
   void initState() {
     super.initState();
-
+    // اتشال authStateChanges من هنا عشان ميقطعش الأنيميشن
     fileLoader = FileLoader.fromAsset(
       'assets/animations/login.riv',
       riveFactory: Factory.rive,
@@ -49,22 +59,101 @@ class _LoginState extends State<Login> {
     numLook = sm.number('numLook');
     trigSuccess = sm.trigger('trigSuccess');
     trigFail = sm.trigger('trigFail');
+
+    // للتأكد إن الأسماء مطابقة لملف Rive (لو طلع null يبقى الاسم غلط)
+    debugPrint('rive inputs -> success=$trigSuccess fail=$trigFail');
   }
 
-  // الدب ينظر إلى الإيميل أثناء الكتابة
   void _onEmailFocusChanged() {
     isChecking?.value = emailFocus.hasFocus;
     if (emailFocus.hasFocus) _onEmailChanged();
   }
 
   void _onEmailChanged() {
-    // numLook تقريبًا من 0 إلى 100 حسب طول النص
     numLook?.value = (email.text.length * 2.0).clamp(0, 100).toDouble();
   }
 
-  // الدب يغطي عينيه عند التركيز على كلمة المرور
   void _onPasswordFocusChanged() {
     isHandsUp?.value = passwordFocus.hasFocus;
+  }
+
+  String _authMessage(String code) {
+    switch (code) {
+      case 'invalid-credential':
+      case 'user-not-found':
+      case 'wrong-password':
+        return 'Email or password is incorrect.';
+      case 'invalid-email':
+        return 'Please enter a valid email.';
+      case 'user-disabled':
+        return 'This account has been disabled.';
+      case 'too-many-requests':
+        return 'Too many attempts. Try again later.';
+      case 'network-request-failed':
+        return 'No internet connection.';
+      default:
+        return 'Something went wrong. Please try again.';
+    }
+  }
+
+  void _showMessage(String text) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _login() async {
+    if (isLoading) return;
+
+    if (!form.currentState!.validate()) {
+      trigFail?.fire();
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    setState(() => isLoading = true);
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email.text.trim(),
+        password: password.text,
+      );
+      TextInput.finishAutofillContext();
+
+      trigSuccess?.fire();
+      // مدة أنيميشن النجاح، ظبطها حسب ملف الـ .riv
+      await Future.delayed(const Duration(milliseconds: 1500));
+
+      final name = FirebaseAuth.instance.currentUser?.displayName;
+      await SharedPreferencesAsync().setString("username", name ?? "");
+
+      if (mounted) context.go(AppRouter.home);
+    } on FirebaseAuthException catch (e) {
+      trigFail?.fire();
+      TextInput.finishAutofillContext(shouldSave: false);
+      if (mounted) _showMessage(_authMessage(e.code));
+    } catch (e) {
+      trigFail?.fire();
+      debugPrint('login error: $e');
+      if (mounted) _showMessage('Something went wrong. Please try again.');
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    final value = email.text.trim();
+    if (Validators.email(value) != null) {
+      _showMessage('Enter your email first.');
+      emailFocus.requestFocus();
+      return;
+    }
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: value);
+      if (mounted) _showMessage('Reset link sent. Check your email.');
+    } on FirebaseAuthException catch (e) {
+      if (mounted) _showMessage(_authMessage(e.code));
+    }
   }
 
   @override
@@ -83,6 +172,11 @@ class _LoginState extends State<Login> {
 
   @override
   Widget build(BuildContext context) {
+    final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+      fontSize: 15,
+      fontWeight: FontWeight.w300,
+    );
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -108,7 +202,7 @@ class _LoginState extends State<Login> {
                       child: const Icon(Icons.play_arrow_outlined),
                     ),
                     Text(
-                      "Ciema Scope",
+                      "Cinema Scope",
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ],
@@ -117,34 +211,37 @@ class _LoginState extends State<Login> {
                 25.verticalSpace,
 
                 // Rive Animation
-                SizedBox(
-                  height: 200.h,
-                  child: RiveWidgetBuilder(
-                    fileLoader: fileLoader,
-                    stateMachineSelector: StateMachineSelector.byName(
-                      'Login Machine',
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: SizedBox(
+                    height: 200.h,
+                    child: RiveWidgetBuilder(
+                      fileLoader: fileLoader,
+                      stateMachineSelector: StateMachineSelector.byName(
+                        'Login Machine',
+                      ),
+                      onLoaded: _onRiveLoaded,
+                      builder: (context, state) {
+                        if (state is RiveLoaded) {
+                          return RiveWidget(
+                            controller: state.controller,
+                            fit: Fit.cover,
+                          );
+                        }
+                        if (state is RiveFailed) {
+                          debugPrint('rive failed: ${state.error}');
+                          return const Center(
+                            child: Icon(Icons.movie_outlined),
+                          );
+                        }
+                        return const Center(child: CircularProgressIndicator());
+                      },
                     ),
-                    onLoaded: _onRiveLoaded,
-                    builder: (context, state) {
-                      if (state is RiveLoaded) {
-                        return RiveWidget(
-                          controller: state.controller,
-                          fit: Fit.cover,
-                        );
-                      }
-
-                      if (state is RiveFailed) {
-                        return Center(child: Text('Failed: ${state.error}'));
-                      }
-
-                      return const Center(child: CircularProgressIndicator());
-                    },
                   ),
                 ),
 
                 25.verticalSpace,
 
-                // Welcome
                 Text(
                   "Welcome back.",
                   style: Theme.of(
@@ -161,77 +258,77 @@ class _LoginState extends State<Login> {
 
                 25.verticalSpace,
 
-                // Email
-                Text(
-                  "Email address",
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w300,
-                  ),
-                ),
-
-                10.verticalSpace,
-
-                TextFiledWidget(
-                  hint: "alex@email.com",
-                  controller: email,
-                  focusNode: emailFocus, // خاص بصفحة الـ Login فقط
-                ),
-
-                10.verticalSpace,
-
-                // Password
-                Text(
-                  "Password",
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w300,
-                  ),
-                ),
-
-                10.verticalSpace,
-
-                TextFiledWidget(
-                  hint: "Enter your password",
-                  isSecure: true,
-                  controller: password,
-                  focusNode: passwordFocus, // خاص بصفحة الـ Login فقط
-                ),
-                5.verticalSpace,
-                Row(
-                  mainAxisAlignment: .end,
-                  children: [
-                    TextButton(
-                      onPressed: () {},
-                      child: Text(
-                        "Forgot password?",
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              fontSize: 13,
-                              color: Theme.of(context).highlightColor,
+                AutofillGroup(
+                  child: Form(
+                    key: form,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Email address", style: titleStyle),
+                        10.verticalSpace,
+                        TextFiledWidget(
+                          hint: "alex@email.com",
+                          controller: email,
+                          focusNode: emailFocus,
+                          validator: Validators.email,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => passwordFocus.requestFocus(),
+                          autofillHints: const [AutofillHints.email],
+                        ),
+                        10.verticalSpace,
+                        Text("Password", style: titleStyle),
+                        10.verticalSpace,
+                        TextFiledWidget(
+                          hint: "Enter your password",
+                          isSecure: true,
+                          controller: password,
+                          focusNode: passwordFocus,
+                          validator: Validators.requiredPassword,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _login(),
+                          autofillHints: const [AutofillHints.password],
+                        ),
+                        5.verticalSpace,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: _resetPassword,
+                              child: Text(
+                                "Forgot password?",
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      fontSize: 13,
+                                      color: Theme.of(context).highlightColor,
+                                    ),
+                              ),
                             ),
-                      ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
+
                 Center(
-                  child: Btn(title: "Login", onPressed: () {}),
+                  child: isLoading
+                      ? const CircularProgressIndicator()
+                      : Btn(title: "Login", onPressed: _login),
                 ),
                 8.verticalSpace,
 
-                Center(
-                  child: Row(
-                    children: [
-                      Expanded(child: Divider(height: 1)),
-                      Expanded(
-                        child: Text(
-                          " or continue with",
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
+                Row(
+                  children: [
+                    const Expanded(child: Divider(height: 1)),
+                    Expanded(
+                      child: Text(
+                        " or continue with",
+                        style: Theme.of(context).textTheme.titleSmall,
                       ),
-                      Expanded(child: Divider(height: 1)),
-                    ],
-                  ),
+                    ),
+                    const Expanded(child: Divider(height: 1)),
+                  ],
                 ),
                 8.verticalSpace,
 
@@ -241,98 +338,30 @@ class _LoginState extends State<Login> {
                 20.verticalSpace,
                 Center(
                   child: TextButton(
-                    onPressed: () {},
-                    child: Text(
-                      "Sign Up",
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleMedium?.copyWith(fontSize: 13),
+                    onPressed: () => context.push(AppRouter.signUp),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "New to Cinema scope?  ",
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleMedium?.copyWith(fontSize: 13),
+                        ),
+                        Text(
+                          "Create an account",
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontSize: 13,
+                                color: Theme.of(context).highlightColor,
+                              ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// --------------------------------------------------
-// TextField Widget (reusable)
-// --------------------------------------------------
-
-class TextFiledWidget extends StatefulWidget {
-  const TextFiledWidget({
-    super.key,
-    this.hint,
-    this.isSecure = false,
-    required this.controller,
-    this.focusNode, // اختياري: الأماكن الأخرى مش لازم تمرره
-  });
-
-  final bool isSecure;
-  final String? hint;
-  final TextEditingController controller;
-  final FocusNode? focusNode;
-
-  @override
-  State<TextFiledWidget> createState() => _TextFiledWidgetState();
-}
-
-class _TextFiledWidgetState extends State<TextFiledWidget> {
-  late bool secure;
-
-  @override
-  void initState() {
-    super.initState();
-    secure = widget.isSecure;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 342.w,
-      height: 56.h,
-      child: TextField(
-        controller: widget.controller,
-        focusNode: widget.focusNode, // لو null، Flutter ينشئ واحدًا تلقائيًا
-        obscureText: secure,
-        maxLines: 1,
-
-        textAlignVertical: TextAlignVertical.center,
-
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 16),
-
-        cursorColor: Theme.of(context).hintColor,
-
-        decoration: InputDecoration(
-          filled: true,
-          fillColor: Theme.of(context).hoverColor,
-
-          hintText: widget.hint,
-          hintStyle: Theme.of(context).textTheme.titleSmall,
-
-          suffixIcon: widget.isSecure
-              ? IconButton(
-                  onPressed: () {
-                    setState(() {
-                      secure = !secure;
-                    });
-                  },
-                  icon: Icon(secure ? Icons.visibility_off : Icons.visibility),
-                )
-              : null,
-
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Theme.of(context).focusColor),
-          ),
-
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Theme.of(context).focusColor),
           ),
         ),
       ),
