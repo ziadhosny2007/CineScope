@@ -2,6 +2,7 @@ import 'package:cinema_scope/core/routes/app_router.dart';
 import 'package:cinema_scope/core/validator.dart';
 import 'package:cinema_scope/core/widget/btn.dart';
 import 'package:cinema_scope/core/widget/dark_btn.dart';
+import 'package:cinema_scope/core/widget/loading_btn.dart';
 import 'package:cinema_scope/core/widget/textfield.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -80,11 +81,17 @@ class _SignUpState extends State<SignUp> {
           );
       final name = fullName.text.trim();
       await credential.user?.updateDisplayName(name);
+      try {
+        await credential.user?.sendEmailVerification();
+      } catch (e) {
+        debugPrint('verification email failed: $e');
+        // مش مشكلة، يقدر يعمل Resend من صفحة VerifyEmail
+      }
       await credential.user?.reload();
       await SharedPreferencesAsync().setString('username', name);
 
       TextInput.finishAutofillContext();
-      if (mounted) context.go(AppRouter.home);
+      if (mounted) context.go(AppRouter.verifyEmail);
     } on FirebaseAuthException catch (e) {
       TextInput.finishAutofillContext(shouldSave: false);
       if (mounted) _showMessage(_authMessage(e.code));
@@ -99,9 +106,9 @@ class _SignUpState extends State<SignUp> {
   @override
   Widget build(BuildContext context) {
     final labelStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
-          fontSize: 15,
-          fontWeight: FontWeight.w300,
-        );
+      fontSize: 15,
+      fontWeight: FontWeight.w300,
+    );
 
     return Scaffold(
       body: SafeArea(
@@ -149,10 +156,9 @@ class _SignUpState extends State<SignUp> {
 
                 Text(
                   "Start your story.",
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontSize: 30),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(fontSize: 30),
                 ),
 
                 5.verticalSpace,
@@ -227,10 +233,9 @@ class _SignUpState extends State<SignUp> {
                         8.verticalSpace,
                         Text(
                           "Use at least 8 characters, a number and a symbol.",
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
-                              ?.copyWith(fontSize: 13),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleSmall?.copyWith(fontSize: 13),
                         ),
                       ],
                     ),
@@ -240,7 +245,7 @@ class _SignUpState extends State<SignUp> {
                 16.verticalSpace,
                 Center(
                   child: isLoading
-                      ? const CircularProgressIndicator()
+                      ? LoadingBtn()
                       : Btn(title: "Create account", onPressed: _signUp),
                 ),
                 8.verticalSpace,
@@ -259,9 +264,9 @@ class _SignUpState extends State<SignUp> {
                 ),
                 8.verticalSpace,
 
-                Center(child: DarkBtn(title: "Google", onPressed: () {
-                  
-                })),
+                Center(
+                  child: DarkBtn(title: "Google", onPressed: () {}),
+                ),
                 20.verticalSpace,
 
                 Center(
@@ -278,16 +283,13 @@ class _SignUpState extends State<SignUp> {
                       children: [
                         Text(
                           "Already have an account?",
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontSize: 13),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleMedium?.copyWith(fontSize: 13),
                         ),
                         Text(
                           "  Log in",
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
+                          style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
                                 fontSize: 13,
                                 color: Theme.of(context).highlightColor,

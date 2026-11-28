@@ -4,6 +4,7 @@ import 'package:cinema_scope/core/routes/app_router.dart';
 import 'package:cinema_scope/core/validator.dart';
 import 'package:cinema_scope/core/widget/btn.dart';
 import 'package:cinema_scope/core/widget/dark_btn.dart';
+import 'package:cinema_scope/core/widget/loading_btn.dart';
 import 'package:cinema_scope/core/widget/textfield.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -118,6 +119,15 @@ class _LoginState extends State<Login> {
         email: email.text.trim(),
         password: password.text,
       );
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (mounted) {
+        context.go(
+          (user?.emailVerified ?? false)
+              ? AppRouter.home
+              : AppRouter.verifyEmail,
+        );
+      }
       TextInput.finishAutofillContext();
 
       trigSuccess?.fire();
@@ -141,20 +151,7 @@ class _LoginState extends State<Login> {
     }
   }
 
-  Future<void> _resetPassword() async {
-    final value = email.text.trim();
-    if (Validators.email(value) != null) {
-      _showMessage('Enter your email first.');
-      emailFocus.requestFocus();
-      return;
-    }
-    try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: value);
-      if (mounted) _showMessage('Reset link sent. Check your email.');
-    } on FirebaseAuthException catch (e) {
-      if (mounted) _showMessage(_authMessage(e.code));
-    }
-  }
+
 
   @override
   void dispose() {
@@ -173,7 +170,7 @@ class _LoginState extends State<Login> {
   @override
   Widget build(BuildContext context) {
     final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
-      fontSize: 15,
+      fontSize: 15.sp,
       fontWeight: FontWeight.w300,
     );
 
@@ -181,7 +178,7 @@ class _LoginState extends State<Login> {
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: EdgeInsets.symmetric(horizontal: 24.w),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -192,8 +189,8 @@ class _LoginState extends State<Login> {
                   spacing: 8,
                   children: [
                     Container(
-                      height: 36,
-                      width: 36,
+                      height: 36.h,
+                      width: 36.w,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8.r),
@@ -212,7 +209,7 @@ class _LoginState extends State<Login> {
 
                 // Rive Animation
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(20.r),
                   child: SizedBox(
                     height: 200.h,
                     child: RiveWidgetBuilder(
@@ -246,7 +243,7 @@ class _LoginState extends State<Login> {
                   "Welcome back.",
                   style: Theme.of(
                     context,
-                  ).textTheme.titleMedium?.copyWith(fontSize: 30),
+                  ).textTheme.titleMedium?.copyWith(fontSize: 30.sp),
                 ),
 
                 5.verticalSpace,
@@ -294,12 +291,14 @@ class _LoginState extends State<Login> {
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             TextButton(
-                              onPressed: _resetPassword,
+                              onPressed:(){
+                                context.push(AppRouter.forgotPassword);
+                              },
                               child: Text(
                                 "Forgot password?",
                                 style: Theme.of(context).textTheme.titleMedium
                                     ?.copyWith(
-                                      fontSize: 13,
+                                      fontSize: 13.sp,
                                       color: Theme.of(context).highlightColor,
                                     ),
                               ),
@@ -313,21 +312,21 @@ class _LoginState extends State<Login> {
 
                 Center(
                   child: isLoading
-                      ? const CircularProgressIndicator()
+                      ? LoadingBtn()
                       : Btn(title: "Login", onPressed: _login),
                 ),
                 8.verticalSpace,
 
                 Row(
                   children: [
-                    const Expanded(child: Divider(height: 1)),
+                    Expanded(child: Divider(height: 1.h)),
                     Expanded(
                       child: Text(
                         " or continue with",
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                     ),
-                    const Expanded(child: Divider(height: 1)),
+                    Expanded(child: Divider(height: 1.h)),
                   ],
                 ),
                 8.verticalSpace,
@@ -346,13 +345,13 @@ class _LoginState extends State<Login> {
                           "New to Cinema scope?  ",
                           style: Theme.of(
                             context,
-                          ).textTheme.titleMedium?.copyWith(fontSize: 13),
+                          ).textTheme.titleMedium?.copyWith(fontSize: 13.sp),
                         ),
                         Text(
                           "Create an account",
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
-                                fontSize: 13,
+                                fontSize: 13.sp,
                                 color: Theme.of(context).highlightColor,
                               ),
                         ),

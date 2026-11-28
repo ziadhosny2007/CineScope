@@ -20,7 +20,6 @@ class TextFiledWidget extends StatefulWidget {
   final TextInputAction? textInputAction;
   final void Function(String)? onFieldSubmitted;
   final Iterable<String>? autofillHints;
-
   final bool isSecure;
   final String? hint;
   final TextEditingController controller;

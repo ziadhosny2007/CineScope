@@ -6,6 +6,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class Splash extends StatefulWidget {
   const Splash({super.key});
@@ -22,7 +23,15 @@ class _SplashState extends State<Splash> {
     Future.delayed(Duration(seconds: 5), () async {
       bool? isFirst = await sharedPreferencesAsync.getBool("isFirst");
       if (isFirst == false) {
-        context.go(AppRouter.login);
+        final user = FirebaseAuth.instance.currentUser;
+
+if (user == null) {
+  context.go(AppRouter.login);
+} else if (!user.emailVerified) {
+  context.go(AppRouter.verifyEmail);
+} else {
+  context.go(AppRouter.home);
+}
       } else {
         context.go(AppRouter.onboarding);
       }
